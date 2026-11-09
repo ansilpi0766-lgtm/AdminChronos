@@ -2,9 +2,6 @@ import axios from "axios";
 
 const API = axios.create({
   baseURL: "http://localhost:5000/api/v1",
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Automatically attach JWT token
@@ -13,6 +10,11 @@ API.interceptors.request.use((config) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Allow Axios and the browser to set the multipart boundary
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
   }
 
   return config;
