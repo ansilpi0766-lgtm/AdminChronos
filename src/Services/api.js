@@ -14,11 +14,21 @@ API.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+<<<<<<< HEAD
     return config;
   },
   (error) => {
     return Promise.reject(error);
   },
 );
+=======
+  // Allow Axios and the browser to set the multipart boundary
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
+
+  return config;
+});
+>>>>>>> 70aeeb9897e0568ed0ddb486646b956588095fd5
 
 export default API;
