@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { AlertTriangle, PackageX, Package } from "lucide-react";
 import api from "../../Services/api";
 
 const Products = () => {
@@ -7,20 +8,18 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch all products
+  // FETCH PRODUCTS
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError("");
 
       const res = await api.get("/products");
-
       const productData = res.data.products || res.data;
 
       setProducts(Array.isArray(productData) ? productData : []);
     } catch (error) {
       console.error("Fetch products error:", error);
-
       setError(
         error.response?.data?.message ||
           "Failed to load products. Please try again.",
@@ -30,12 +29,11 @@ const Products = () => {
     }
   };
 
-  // Load products when page opens
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  // Delete product
+  // DELETE PRODUCT
   const deleteProduct = async (id) => {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this product?",
@@ -51,12 +49,20 @@ const Products = () => {
       alert("Product deleted successfully!");
     } catch (error) {
       console.error("Delete product error:", error);
-
       alert(error.response?.data?.message || "Failed to delete product");
     }
   };
 
-  // Loading screen
+  // STOCK COUNTS
+  const lowStockCount = products.filter((product) => {
+    const stock = Number(product.stock) || 0;
+    return stock > 0 && stock <= 5;
+  }).length;
+
+  const outOfStockCount = products.filter(
+    (product) => (Number(product.stock) || 0) <= 0,
+  ).length;
+
   if (loading) {
     return (
       <div className="p-8 text-center text-gray-500">Loading products...</div>
@@ -65,11 +71,10 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f5f0] p-6">
-      {/* Page Header */}
+      {/* PAGE HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#421713]">Products</h1>
-
           <p className="text-gray-500 mt-2">Manage your CHRONOS products</p>
         </div>
 
@@ -81,30 +86,65 @@ const Products = () => {
         </Link>
       </div>
 
-      {/* Product Count */}
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-        <p className="text-gray-500 text-sm">Total Products</p>
+      {/* PRODUCT KPI CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+        {/* TOTAL PRODUCTS */}
+        <div className="bg-white rounded-xl shadow-sm p-5 flex items-center justify-between">
+          <div>
+            <p className="text-gray-500 text-sm">Total Products</p>
+            <h2 className="text-2xl font-bold text-[#421713] mt-1">
+              {products.length}
+            </h2>
+          </div>
 
-        <h2 className="text-2xl font-bold text-[#421713] mt-1">
-          {products.length}
-        </h2>
+          <div className="bg-[#f5eee5] p-3 rounded-lg">
+            <Package size={24} className="text-[#421713]" />
+          </div>
+        </div>
+
+        {/* LOW STOCK */}
+        <div className="bg-white rounded-xl shadow-sm p-5 flex items-center justify-between">
+          <div>
+            <p className="text-gray-500 text-sm">Low Stock Products</p>
+            <h2 className="text-2xl font-bold text-amber-600 mt-1">
+              {lowStockCount}
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">1–5 items remaining</p>
+          </div>
+
+          <div className="bg-amber-50 p-3 rounded-lg">
+            <AlertTriangle size={24} className="text-amber-600" />
+          </div>
+        </div>
+
+        {/* OUT OF STOCK */}
+        <div className="bg-white rounded-xl shadow-sm p-5 flex items-center justify-between">
+          <div>
+            <p className="text-gray-500 text-sm">Out of Stock</p>
+            <h2 className="text-2xl font-bold text-red-600 mt-1">
+              {outOfStockCount}
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">No stock available</p>
+          </div>
+
+          <div className="bg-red-50 p-3 rounded-lg">
+            <PackageX size={24} className="text-red-600" />
+          </div>
+        </div>
       </div>
 
-      {/* Error Message */}
+      {/* ERROR MESSAGE */}
       {error && (
-        <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-5">
-          {error}
+        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-6 flex justify-between items-center">
+          <span>{error}</span>
 
-          <button
-            onClick={fetchProducts}
-            className="ml-3 underline font-medium"
-          >
+          <button onClick={fetchProducts} className="font-semibold underline">
             Retry
           </button>
         </div>
       )}
 
-      {/* Products Table */}
+      {/* PRODUCTS TABLE */}
       <div className="overflow-x-auto bg-white rounded-xl shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-[#f5eee5] text-[#421713]">
@@ -124,7 +164,6 @@ const Products = () => {
                 key={product._id}
                 className="border-b hover:bg-[#faf8f5] transition"
               >
-                {/* Product Image */}
                 <td className="p-4">
                   <img
                     src={product.image}
@@ -133,20 +172,16 @@ const Products = () => {
                   />
                 </td>
 
-                {/* Product Name */}
                 <td className="p-4 font-medium text-gray-800">
                   {product.name}
                 </td>
 
-                {/* Category */}
                 <td className="p-4 text-gray-600">{product.category}</td>
 
-                {/* Price */}
                 <td className="p-4 font-medium">
                   ${Number(product.price).toLocaleString("en-US")}
                 </td>
 
-                {/* Stock */}
                 <td className="p-4">
                   <span
                     className={`px-3 py-1 rounded-full text-sm ${
@@ -159,7 +194,6 @@ const Products = () => {
                   </span>
                 </td>
 
-                {/* Actions */}
                 <td className="p-4">
                   <div className="flex items-center gap-4">
                     <Link
@@ -180,7 +214,6 @@ const Products = () => {
               </tr>
             ))}
 
-            {/* Empty Products */}
             {products.length === 0 && !error && (
               <tr>
                 <td colSpan="6" className="text-center p-10 text-gray-500">

@@ -6,7 +6,7 @@ import {
   ShoppingCart,
   Users,
   Layers,
-  Star,
+  Tags,
   LogOut,
 } from "lucide-react";
 
@@ -17,7 +17,7 @@ const Sidebar = () => {
     { name: "Orders", path: "/admin/orders", icon: ShoppingCart },
     { name: "Customers", path: "/admin/customers", icon: Users },
     { name: "Categories", path: "/admin/categories", icon: Layers },
-    { name: "Reviews", path: "/admin/reviews", icon: Star },
+    { name: "Brands", path: "/admin/brands", icon: Tags },
   ];
 
   const handleLogout = () => {

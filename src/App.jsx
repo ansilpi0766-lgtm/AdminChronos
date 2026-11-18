@@ -1,118 +1,87 @@
+import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import AdminLogin from "./Pages/AdminLogin";
-import Dashboard from "./Pages/Dashboard";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-import AdminLayout from "./Layout/AdminLayout";
+// Authentication
+import AdminLogin from "./Pages/AdminLogin";
 import ProtectedRoute from "./Pages/ProtectedRoute";
 
+// Layout
+import AdminLayout from "./Layout/AdminLayout";
+
+// Dashboard
+import Dashboard from "./Pages/Dashboard";
+
+// Products
 import Products from "./Pages/Products/Products";
 import AddProducts from "./Pages/Products/AddProducts";
 import EditProducts from "./Pages/Products/EditProducts";
 
+// Categories
 import Categories from "./Pages/Categories";
 import AddCategory from "./Pages/Categories/AddCategory";
 import EditCategory from "./Pages/Categories/EditCategory";
+
+import AddBrand from "./Pages/Brands/AddBrand";
+import Brands from "./Pages/Brands/Brands";
+import EditBrand from "./Pages/Brands/EditBrand";
+
+// Orders
 import Orders from "./Pages/Order/Orders";
+
+// Customers
+import Customers from "./Pages/Customers/Customers";
+import CustomerDetails from "./Pages/Customers/CustomerDetails";
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/admin/login" />} />
+    <>
+      <ToastContainer position="top-right" autoClose={3000} />
 
-      {/* Admin Login */}
-      <Route path="/admin/login" element={<AdminLogin />} />
+      <Routes>
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
-      {/* DASHBOARD */}
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <Dashboard />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Admin Login */}
+        <Route path="/admin/login" element={<AdminLogin />} />
 
-      {/* PRODUCTS */}
-      <Route
-        path="/admin/products"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <Products />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          {/* Dashboard */}
+          <Route path="dashboard" element={<Dashboard />} />
+          {/* Products */}
+          <Route path="products" element={<Products />} />
+          <Route path="products/add" element={<AddProducts />} />
+          <Route path="products/edit/:id" element={<EditProducts />} />
+          {/* Categories */}
+          <Route path="categories" element={<Categories />} />
+          <Route path="categories/add" element={<AddCategory />} />
+          <Route path="categories/edit/:id" element={<EditCategory />} />
+          {/* // brand */}
+          <Route path="brands" element={<Brands />} />
+          <Route path="brands/add" element={<AddBrand />} />
+          <Route path="brands/edit/:id" element={<EditBrand />} />
+          {/* Orders */}
+          <Route path="orders" element={<Orders />} />
+          {/* Customers */}
+          <Route path="customers" element={<Customers />} />
+          <Route path="customers/:id" element={<CustomerDetails />} />
+        </Route>
 
-      <Route
-        path="/admin/products/add"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <AddProducts />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/products/edit/:id"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <EditProducts />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* CATEGORIES */}
-      <Route
-        path="/admin/categories"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <Categories />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ADD CATEGORY */}
-      <Route
-        path="/admin/categories/add"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <AddCategory />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/categories/edit/:id"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <EditCategory />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/orders"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <Orders />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+        {/* Invalid URL */}
+        <Route path="*" element={<Navigate to="/admin/login" replace />} />
+      </Routes>
+    </>
   );
 }
 
