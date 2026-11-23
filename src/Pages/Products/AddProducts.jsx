@@ -13,6 +13,7 @@ const emptyVariant = () => ({
 const AddProducts = () => {
   const navigate = useNavigate();
 
+  // PRODUCT FORM
   const [formData, setFormData] = useState({
     productName: "",
     price: "",
@@ -21,25 +22,34 @@ const AddProducts = () => {
     stock: "",
     description: "",
     size: "",
+    gender: "Unisex",
+    isFeatured: false,
   });
 
+  // CATEGORIES
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState("");
 
+  // BRANDS
   const [brands, setBrands] = useState([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [brandsError, setBrandsError] = useState("");
 
+  // MAIN IMAGE
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState("");
 
+  // VARIANTS
   const [variants, setVariants] = useState([emptyVariant()]);
 
+  // SUBMISSION
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // --------------------------------
   // FETCH CATEGORIES
+  // --------------------------------
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -47,7 +57,9 @@ const AddProducts = () => {
         setCategoriesError("");
 
         const res = await api.get("/categories");
+
         const data = res.data;
+
         const categoryList = Array.isArray(data) ? data : data.categories || [];
 
         setCategories(
@@ -55,6 +67,7 @@ const AddProducts = () => {
         );
       } catch (err) {
         console.error("Fetch categories error:", err);
+
         setCategoriesError(
           err.response?.data?.message || "Failed to load categories",
         );
@@ -66,7 +79,9 @@ const AddProducts = () => {
     fetchCategories();
   }, []);
 
+  // --------------------------------
   // FETCH BRANDS
+  // --------------------------------
   useEffect(() => {
     const fetchBrands = async () => {
       try {
@@ -74,12 +89,15 @@ const AddProducts = () => {
         setBrandsError("");
 
         const res = await api.get("/brands");
+
         const data = res.data;
+
         const brandList = Array.isArray(data) ? data : data.brands || [];
 
         setBrands(brandList.filter((brand) => brand.isActive !== false));
       } catch (err) {
         console.error("Fetch brands error:", err);
+
         setBrandsError(err.response?.data?.message || "Failed to load brands");
       } finally {
         setBrandsLoading(false);
@@ -89,7 +107,9 @@ const AddProducts = () => {
     fetchBrands();
   }, []);
 
+  // --------------------------------
   // FORM INPUT
+  // --------------------------------
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -99,7 +119,9 @@ const AddProducts = () => {
     }));
   };
 
-  // MAIN PRODUCT IMAGE
+  // --------------------------------
+  // MAIN IMAGE UPLOAD
+  // --------------------------------
   const handleImageChange = (e) => {
     const selectedImage = e.target.files?.[0];
 
@@ -121,7 +143,9 @@ const AddProducts = () => {
     setImage(selectedImage);
   };
 
+  // --------------------------------
   // MAIN IMAGE PREVIEW
+  // --------------------------------
   useEffect(() => {
     if (!image) {
       setPreview("");
@@ -129,22 +153,29 @@ const AddProducts = () => {
     }
 
     const imageUrl = URL.createObjectURL(image);
+
     setPreview(imageUrl);
 
     return () => URL.revokeObjectURL(imageUrl);
   }, [image]);
 
+  // --------------------------------
   // ADD VARIANT
+  // --------------------------------
   const addVariant = () => {
     setVariants((prev) => [...prev, emptyVariant()]);
   };
 
+  // --------------------------------
   // REMOVE VARIANT
+  // --------------------------------
   const removeVariant = (index) => {
     setVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // --------------------------------
   // UPDATE VARIANT
+  // --------------------------------
   const handleVariantChange = (index, field, value) => {
     setVariants((prev) =>
       prev.map((variant, i) =>
@@ -153,7 +184,9 @@ const AddProducts = () => {
     );
   };
 
+  // --------------------------------
   // ADD OPTION
+  // --------------------------------
   const addOption = (variantIndex) => {
     setVariants((prev) =>
       prev.map((variant, i) =>
@@ -167,7 +200,9 @@ const AddProducts = () => {
     );
   };
 
+  // --------------------------------
   // REMOVE OPTION
+  // --------------------------------
   const removeOption = (variantIndex, optionIndex) => {
     setVariants((prev) =>
       prev.map((variant, i) =>
@@ -183,7 +218,9 @@ const AddProducts = () => {
     );
   };
 
+  // --------------------------------
   // UPDATE OPTION
+  // --------------------------------
   const handleOptionChange = (variantIndex, optionIndex, field, value) => {
     setVariants((prev) =>
       prev.map((variant, i) =>
@@ -201,7 +238,9 @@ const AddProducts = () => {
     );
   };
 
+  // --------------------------------
   // VARIANT IMAGE UPLOAD
+  // --------------------------------
   const handleVariantImages = (index, files) => {
     const selectedFiles = Array.from(files);
 
@@ -219,13 +258,18 @@ const AddProducts = () => {
     setVariants((prev) =>
       prev.map((variant, i) =>
         i === index
-          ? { ...variant, images: [...variant.images, ...selectedFiles] }
+          ? {
+              ...variant,
+              images: [...variant.images, ...selectedFiles],
+            }
           : variant,
       ),
     );
   };
 
+  // --------------------------------
   // REMOVE VARIANT IMAGE
+  // --------------------------------
   const removeVariantImage = (variantIndex, imageIndex) => {
     setVariants((prev) =>
       prev.map((variant, i) =>
@@ -241,11 +285,14 @@ const AddProducts = () => {
     );
   };
 
+  // --------------------------------
   // SUBMIT PRODUCT
+  // --------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
+    // REQUIRED FIELD VALIDATION
     if (
       !formData.productName.trim() ||
       !formData.price ||
@@ -259,6 +306,7 @@ const AddProducts = () => {
       return;
     }
 
+    // PRICE VALIDATION
     if (
       !Number.isFinite(Number(formData.price)) ||
       Number(formData.price) <= 0
@@ -267,6 +315,7 @@ const AddProducts = () => {
       return;
     }
 
+    // STOCK VALIDATION
     if (
       !Number.isInteger(Number(formData.stock)) ||
       Number(formData.stock) < 0
@@ -275,6 +324,7 @@ const AddProducts = () => {
       return;
     }
 
+    // VARIANT VALIDATION
     if (variants.length === 0) {
       setError("Please add at least one variant.");
       return;
@@ -321,25 +371,40 @@ const AddProducts = () => {
 
       const data = new FormData();
 
+      // PRODUCT INFORMATION
       data.append("productName", formData.productName.trim());
+
       data.append("price", formData.price);
       data.append("category", formData.category);
       data.append("brand", formData.brand);
       data.append("stock", formData.stock);
+
       data.append("description", formData.description.trim());
 
+      // NEW FIELDS
+      data.append("gender", formData.gender);
+
+      data.append("isFeatured", String(formData.isFeatured));
+
+      // NEW PRODUCTS START WITH ZERO SALES
+      data.append("salesCount", "0");
+
+      // SIZES
       const sizes = formData.size
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
 
       data.append("size", JSON.stringify(sizes));
+
+      // MAIN IMAGE
       data.append("image", image);
 
-      // SEND VARIANT INFORMATION
+      // VARIANT INFORMATION
       const variantData = variants.map(({ sku, stock, options }) => ({
         sku: sku.trim(),
         stock: Number(stock),
+
         options: options.map((option) => ({
           name: option.name.trim(),
           value: option.value.trim(),
@@ -348,17 +413,19 @@ const AddProducts = () => {
 
       data.append("variants", JSON.stringify(variantData));
 
-      // SEND EACH VARIANT'S IMAGES
+      // VARIANT IMAGES
       variants.forEach((variant, index) => {
         variant.images.forEach((file) => {
           data.append(`variantImages_${index}`, file);
         });
       });
 
+      // API REQUEST
       const response = await api.post("/products", data);
 
       if (response.data.success) {
         alert("Product added successfully!");
+
         navigate("/admin/products");
       } else {
         setError(response.data.message || "Product could not be added.");
@@ -375,12 +442,16 @@ const AddProducts = () => {
     }
   };
 
+  // --------------------------------
+  // UI
+  // --------------------------------
   return (
     <div className="min-h-screen bg-[#f8f5f0] p-4 md:p-6">
       <div className="mx-auto max-w-5xl">
         {/* HEADER */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#421713]">Add New Product</h1>
+
           <p className="mt-2 text-gray-500">
             Add products to your CHRONOS collection.
           </p>
@@ -400,6 +471,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Product Name *
               </label>
+
               <input
                 type="text"
                 name="productName"
@@ -416,6 +488,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Price ($) *
               </label>
+
               <input
                 type="number"
                 name="price"
@@ -434,6 +507,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Category *
               </label>
+
               <select
                 name="category"
                 value={formData.category}
@@ -479,6 +553,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Brand *
               </label>
+
               <select
                 name="brand"
                 value={formData.brand}
@@ -519,11 +594,35 @@ const AddProducts = () => {
               )}
             </div>
 
+            {/* GENDER */}
+            <div>
+              <label className="mb-2 block font-medium text-gray-700">
+                Gender *
+              </label>
+
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                required
+              >
+                <option value="His">His</option>
+                <option value="Her">Her</option>
+                <option value="Unisex">Unisex</option>
+              </select>
+
+              <p className="mt-1 text-xs text-gray-400">
+                Choose who this product is designed for.
+              </p>
+            </div>
+
             {/* STOCK */}
             <div>
               <label className="mb-2 block font-medium text-gray-700">
                 Product Stock *
               </label>
+
               <input
                 type="number"
                 name="stock"
@@ -535,6 +634,7 @@ const AddProducts = () => {
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
                 required
               />
+
               <p className="mt-1 text-xs text-gray-400">
                 Overall product stock. Variant stock is managed separately.
               </p>
@@ -545,6 +645,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Available Sizes
               </label>
+
               <input
                 type="text"
                 name="size"
@@ -553,9 +654,39 @@ const AddProducts = () => {
                 placeholder="Example: S, M, L, XL"
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
               />
+
               <p className="mt-1 text-xs text-gray-400">
                 Separate sizes using commas.
               </p>
+            </div>
+
+            {/* FEATURED PRODUCT */}
+            <div className="flex items-center rounded-lg border border-gray-200 bg-[#fcfaf8] p-4">
+              <input
+                type="checkbox"
+                id="isFeatured"
+                checked={formData.isFeatured}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    isFeatured: e.target.checked,
+                  }))
+                }
+                className="h-5 w-5 cursor-pointer accent-[#421713]"
+              />
+
+              <div className="ml-3">
+                <label
+                  htmlFor="isFeatured"
+                  className="cursor-pointer font-medium text-gray-700"
+                >
+                  Featured Product
+                </label>
+
+                <p className="text-xs text-gray-400">
+                  Display this product in Featured Pieces.
+                </p>
+              </div>
             </div>
 
             {/* DESCRIPTION */}
@@ -563,6 +694,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Description *
               </label>
+
               <textarea
                 name="description"
                 rows="5"
@@ -579,6 +711,7 @@ const AddProducts = () => {
               <label className="mb-2 block font-medium text-gray-700">
                 Main Product Image *
               </label>
+
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -596,24 +729,29 @@ const AddProducts = () => {
                   <p className="mb-2 text-sm font-medium text-gray-600">
                     Image Preview
                   </p>
+
                   <img
                     src={preview}
                     alt="Product preview"
                     className="h-40 w-40 rounded-lg border object-cover"
                   />
+
                   <p className="mt-2 text-sm text-gray-500">{image?.name}</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* VARIANTS SECTION */}
+          {/* --------------------------------
+              PRODUCT VARIANTS
+          -------------------------------- */}
           <div className="mt-10 border-t border-gray-200 pt-8">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-[#421713]">
                   Product Variants
                 </h2>
+
                 <p className="mt-1 text-sm text-gray-500">
                   Add different product variations with separate stock and
                   images.
@@ -640,6 +778,7 @@ const AddProducts = () => {
                   <div className="mb-5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Package className="text-[#421713]" size={20} />
+
                       <h3 className="font-semibold text-[#421713]">
                         Variant {index + 1}
                       </h3>
@@ -663,6 +802,7 @@ const AddProducts = () => {
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         SKU *
                       </label>
+
                       <input
                         type="text"
                         value={variant.sku}
@@ -679,6 +819,7 @@ const AddProducts = () => {
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         Variant Stock *
                       </label>
+
                       <input
                         type="number"
                         min="0"
@@ -788,6 +929,7 @@ const AddProducts = () => {
                         className="hidden"
                         onChange={(e) => {
                           handleVariantImages(index, e.target.files);
+
                           e.target.value = "";
                         }}
                       />
