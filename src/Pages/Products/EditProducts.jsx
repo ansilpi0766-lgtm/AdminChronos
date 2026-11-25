@@ -7,8 +7,11 @@ const EditProducts = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [categories, setCategories] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -18,17 +21,44 @@ const EditProducts = () => {
     stock: "",
     size: "",
     description: "",
+    gender: "Unisex",
+    isFeatured: false,
   });
 
   const [mainImage, setMainImage] = useState(null);
   const [mainImagePreview, setMainImagePreview] = useState("");
 
-  // Each variant gets a stable local ID so its selected files
-  // remain associated with it even when variants are removed.
   const [variants, setVariants] = useState([]);
   const [variantImageFiles, setVariantImageFiles] = useState({});
 
-  // Fetch product
+  // =====================================
+  // FETCH REAL CATEGORIES
+  // =====================================
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+
+        const response = await api.get("/categories");
+
+        const categoryList =
+          response.data.categories || response.data.data || [];
+
+        setCategories(Array.isArray(categoryList) ? categoryList : []);
+      } catch (err) {
+        console.error("Category fetching error:", err);
+        setError(err.response?.data?.message || "Failed to load categories.");
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // =====================================
+  // FETCH PRODUCT
+  // =====================================
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -37,14 +67,21 @@ const EditProducts = () => {
         const response = await api.get(`/products/${id}`);
         const product = response.data.product || response.data;
 
+        const existingCategory =
+          typeof product.category === "object"
+            ? product.category?.name || ""
+            : product.category || "";
+
         setFormData({
           name: product.name || "",
           price: product.price ?? "",
-          category: product.category || "",
+          category: existingCategory,
           brand: product.brand || "",
           stock: product.stock ?? "",
           size: Array.isArray(product.size) ? product.size.join(", ") : "",
           description: product.description || "",
+          gender: product.gender || "Unisex",
+          isFeatured: product.isFeatured === true,
         });
 
         setMainImagePreview(product.image || "");
@@ -65,36 +102,56 @@ const EditProducts = () => {
         setVariants(existingVariants);
       } catch (err) {
         console.error("Error fetching product:", err);
+
         setError(err.response?.data?.message || "Failed to load product.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProduct();
+    if (id) {
+      fetchProduct();
+    }
   }, [id]);
 
-  // Product input changes
+  // =====================================
+  // PRODUCT INPUT CHANGES
+  // =====================================
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  // Main product image
+  // =====================================
+  // MAIN IMAGE
+  // =====================================
   const handleMainImageChange = (e) => {
     const file = e.target.files?.[0];
 
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Main image must be smaller than 5MB.");
+      return;
+    }
+
+    setError("");
     setMainImage(file);
     setMainImagePreview(URL.createObjectURL(file));
   };
 
-  // Add new variant
+  // =====================================
+  // ADD VARIANT
+  // =====================================
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
@@ -108,7 +165,9 @@ const EditProducts = () => {
     ]);
   };
 
-  // Remove variant
+  // =====================================
+  // REMOVE VARIANT
+  // =====================================
   const removeVariant = (variantId) => {
     setVariants((prev) =>
       prev.filter((variant) => variant.localId !== variantId),
@@ -121,7 +180,9 @@ const EditProducts = () => {
     });
   };
 
-  // Update variant fields
+  // =====================================
+  // UPDATE VARIANT
+  // =====================================
   const handleVariantChange = (variantId, field, value) => {
     setVariants((prev) =>
       prev.map((variant) =>
@@ -132,7 +193,9 @@ const EditProducts = () => {
     );
   };
 
-  // Add option to variant
+  // =====================================
+  // ADD OPTION
+  // =====================================
   const addOption = (variantId) => {
     setVariants((prev) =>
       prev.map((variant) =>
@@ -146,7 +209,9 @@ const EditProducts = () => {
     );
   };
 
-  // Update option
+  // =====================================
+  // UPDATE OPTION
+  // =====================================
   const handleOptionChange = (variantId, optionIndex, field, value) => {
     setVariants((prev) =>
       prev.map((variant) =>
@@ -162,7 +227,9 @@ const EditProducts = () => {
     );
   };
 
-  // Remove option
+  // =====================================
+  // REMOVE OPTION
+  // =====================================
   const removeOption = (variantId, optionIndex) => {
     setVariants((prev) =>
       prev.map((variant) =>
@@ -178,9 +245,22 @@ const EditProducts = () => {
     );
   };
 
-  // Select variant images
+  // =====================================
+  // SELECT VARIANT IMAGES
+  // =====================================
   const handleVariantImageChange = (variantId, files) => {
     const selectedFiles = Array.from(files || []);
+
+    const invalidFile = selectedFiles.find(
+      (file) => !file.type.startsWith("image/") || file.size > 5 * 1024 * 1024,
+    );
+
+    if (invalidFile) {
+      setError("Each variant image must be an image smaller than 5MB.");
+      return;
+    }
+
+    setError("");
 
     setVariantImageFiles((prev) => ({
       ...prev,
@@ -188,12 +268,46 @@ const EditProducts = () => {
     }));
   };
 
-  // Submit product
+  // =====================================
+  // SUBMIT UPDATED PRODUCT
+  // =====================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    // Validate variants
+    if (!formData.name.trim()) {
+      setError("Please enter a product name.");
+      return;
+    }
+
+    if (!formData.category) {
+      setError("Please select a category.");
+      return;
+    }
+
+    if (!formData.brand.trim()) {
+      setError("Please enter a brand.");
+      return;
+    }
+
+    if (
+      !Number.isFinite(Number(formData.price)) ||
+      Number(formData.price) <= 0
+    ) {
+      setError("Please enter a valid price.");
+      return;
+    }
+
+    if (
+      formData.stock === "" ||
+      !Number.isInteger(Number(formData.stock)) ||
+      Number(formData.stock) < 0
+    ) {
+      setError("Please enter valid product stock.");
+      return;
+    }
+
+    // Validate unique SKUs
     const skus = variants.map((variant) => variant.sku.trim().toLowerCase());
 
     if (skus.some((sku) => !sku)) {
@@ -206,13 +320,14 @@ const EditProducts = () => {
       return;
     }
 
+    // Validate variant stock and options
     for (const variant of variants) {
       if (
         variant.stock === "" ||
         !Number.isInteger(Number(variant.stock)) ||
         Number(variant.stock) < 0
       ) {
-        setError(`Enter a valid stock quantity for ${variant.sku}.`);
+        setError(`Enter valid stock for ${variant.sku}.`);
         return;
       }
 
@@ -231,13 +346,19 @@ const EditProducts = () => {
 
       const formDataToSend = new FormData();
 
-      formDataToSend.append("name", formData.name);
+      // Product information
+      formDataToSend.append("name", formData.name.trim());
       formDataToSend.append("price", formData.price);
       formDataToSend.append("category", formData.category);
-      formDataToSend.append("brand", formData.brand);
+      formDataToSend.append("brand", formData.brand.trim());
       formDataToSend.append("stock", formData.stock);
       formDataToSend.append("description", formData.description);
 
+      // Gender and featured status
+      formDataToSend.append("gender", formData.gender);
+      formDataToSend.append("isFeatured", String(formData.isFeatured));
+
+      // Sizes
       const sizes = formData.size
         .split(",")
         .map((size) => size.trim())
@@ -245,7 +366,7 @@ const EditProducts = () => {
 
       formDataToSend.append("size", JSON.stringify(sizes));
 
-      // Send variant data without local IDs or image URLs.
+      // Variants
       const variantsToSend = variants.map((variant) => ({
         sku: variant.sku.trim(),
         stock: Number(variant.stock),
@@ -257,12 +378,12 @@ const EditProducts = () => {
 
       formDataToSend.append("variants", JSON.stringify(variantsToSend));
 
-      // Main image, if changed
+      // Main image only if replaced
       if (mainImage) {
         formDataToSend.append("image", mainImage);
       }
 
-      // Variant images must use their CURRENT array index.
+      // Variant images
       variants.forEach((variant, index) => {
         const files = variantImageFiles[variant.localId] || [];
 
@@ -274,6 +395,7 @@ const EditProducts = () => {
       await api.put(`/products/${id}`, formDataToSend);
 
       alert("Product updated successfully!");
+
       navigate("/admin/products");
     } catch (err) {
       console.error("Error updating product:", err);
@@ -287,6 +409,9 @@ const EditProducts = () => {
     }
   };
 
+  // =====================================
+  // LOADING
+  // =====================================
   if (loading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
@@ -295,14 +420,22 @@ const EditProducts = () => {
     );
   }
 
+  // Keep the currently saved category visible even if it
+  // has since been removed from the category collection.
+  const categoryExists = categories.some(
+    (category) => category.name === formData.category,
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
       <div className="mx-auto max-w-5xl">
+        {/* HEADER */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Edit Product</h1>
+
             <p className="mt-1 text-sm text-gray-500">
-              Update product details, variants and images.
+              Update product details, categories, variants and images.
             </p>
           </div>
 
@@ -316,17 +449,22 @@ const EditProducts = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Product Details */}
+          {/* ================================= */}
+          {/* PRODUCT INFORMATION */}
+          {/* ================================= */}
+
           <section className="rounded-xl bg-white p-5 shadow-sm md:p-7">
             <h2 className="mb-5 text-lg font-semibold text-gray-900">
               Product Information
             </h2>
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* Product Name */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Product Name
                 </label>
+
                 <input
                   type="text"
                   name="name"
@@ -337,57 +475,85 @@ const EditProducts = () => {
                 />
               </div>
 
+              {/* Price */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Price
                 </label>
+
                 <input
                   type="number"
                   name="price"
                   value={formData.price}
                   onChange={handleChange}
-                  min="0"
+                  min="0.01"
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                 />
               </div>
 
+              {/* REAL CATEGORIES */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Category
                 </label>
+
                 <select
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
                   required
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-black"
+                  disabled={categoriesLoading}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-black disabled:bg-gray-100"
                 >
-                  <option value="">Select Category</option>
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
-                  <option value="Accessories">Accessories</option>
-                  <option value="Fine Art">Fine Art</option>
+                  <option value="">
+                    {categoriesLoading
+                      ? "Loading categories..."
+                      : "Select Category"}
+                  </option>
+
+                  {!categoryExists && formData.category && (
+                    <option value={formData.category}>
+                      {formData.category} (Current category)
+                    </option>
+                  )}
+
+                  {categories.map((category) => (
+                    <option key={category._id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
+
+                {!categoriesLoading && categories.length === 0 && (
+                  <p className="mt-2 text-xs text-red-500">
+                    No categories found. Please check your categories API.
+                  </p>
+                )}
               </div>
 
+              {/* Brand */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Brand
                 </label>
+
                 <input
                   type="text"
                   name="brand"
                   value={formData.brand}
                   onChange={handleChange}
+                  required
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                 />
               </div>
 
+              {/* Total Stock */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Total Stock
                 </label>
+
                 <input
                   type="number"
                   name="stock"
@@ -399,10 +565,12 @@ const EditProducts = () => {
                 />
               </div>
 
+              {/* Sizes */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Sizes (comma separated)
                 </label>
+
                 <input
                   type="text"
                   name="size"
@@ -412,12 +580,52 @@ const EditProducts = () => {
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                 />
               </div>
+
+              {/* Gender */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Gender
+                </label>
+
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-black"
+                >
+                  <option value="His">His</option>
+                  <option value="Her">Her</option>
+                  <option value="Unisex">Unisex</option>
+                </select>
+              </div>
+
+              {/* Featured */}
+              <div className="flex items-center pt-7">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  name="isFeatured"
+                  checked={formData.isFeatured}
+                  onChange={handleChange}
+                  className="h-5 w-5 cursor-pointer accent-black"
+                />
+
+                <label
+                  htmlFor="isFeatured"
+                  className="ml-3 cursor-pointer text-sm font-medium text-gray-700"
+                >
+                  Display as Featured Product
+                </label>
+              </div>
             </div>
 
+            {/* Description */}
             <div className="mt-5">
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Description
               </label>
+
               <textarea
                 name="description"
                 value={formData.description}
@@ -447,16 +655,24 @@ const EditProducts = () => {
                 onChange={handleMainImageChange}
                 className="block w-full text-sm text-gray-600"
               />
+
+              <p className="mt-2 text-xs text-gray-500">
+                Leave empty to keep the existing product image.
+              </p>
             </div>
           </section>
 
-          {/* Variants */}
+          {/* ================================= */}
+          {/* PRODUCT VARIANTS */}
+          {/* ================================= */}
+
           <section className="rounded-xl bg-white p-5 shadow-sm md:p-7">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   Product Variants
                 </h2>
+
                 <p className="mt-1 text-sm text-gray-500">
                   Add different versions, options, stock and images.
                 </p>
@@ -474,6 +690,7 @@ const EditProducts = () => {
             {variants.length === 0 && (
               <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
                 <p className="text-gray-500">No variants added yet.</p>
+
                 <button
                   type="button"
                   onClick={addVariant}
@@ -504,12 +721,13 @@ const EditProducts = () => {
                     </button>
                   </div>
 
-                  {/* SKU and Stock */}
+                  {/* SKU AND STOCK */}
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         SKU
                       </label>
+
                       <input
                         type="text"
                         value={variant.sku}
@@ -530,6 +748,7 @@ const EditProducts = () => {
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         Variant Stock
                       </label>
+
                       <input
                         type="number"
                         min="0"
@@ -547,7 +766,7 @@ const EditProducts = () => {
                     </div>
                   </div>
 
-                  {/* Options */}
+                  {/* VARIANT OPTIONS */}
                   <div className="mt-5">
                     <div className="mb-3 flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-gray-800">
@@ -611,7 +830,7 @@ const EditProducts = () => {
                     ))}
                   </div>
 
-                  {/* Existing Images */}
+                  {/* EXISTING VARIANT IMAGES */}
                   {variant.images?.length > 0 && (
                     <div className="mt-5">
                       <p className="mb-3 text-sm font-semibold text-gray-800">
@@ -631,7 +850,7 @@ const EditProducts = () => {
                     </div>
                   )}
 
-                  {/* Upload Variant Images */}
+                  {/* UPLOAD VARIANT IMAGES */}
                   <div className="mt-5">
                     <label className="mb-2 block text-sm font-semibold text-gray-800">
                       Add / Replace Variant Images
@@ -651,11 +870,11 @@ const EditProducts = () => {
                     />
 
                     <p className="mt-2 text-xs text-gray-500">
-                      Select one or more images. Selecting new images replaces
-                      the existing images for this variant when you save.
+                      Selecting new images replaces existing images for this
+                      variant when you save.
                     </p>
 
-                    {/* New Image Previews */}
+                    {/* NEW IMAGE PREVIEWS */}
                     {variantImageFiles[variant.localId]?.length > 0 && (
                       <div className="mt-4">
                         <p className="mb-2 text-sm font-medium text-gray-700">
@@ -686,14 +905,14 @@ const EditProducts = () => {
             </div>
           </section>
 
-          {/* Error */}
+          {/* ERROR MESSAGE */}
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          {/* Buttons */}
+          {/* BUTTONS */}
           <div className="flex flex-wrap justify-end gap-3 pb-8">
             <button
               type="button"
@@ -705,7 +924,7 @@ const EditProducts = () => {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || categoriesLoading}
               className="rounded-lg bg-black px-7 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? "Updating..." : "Update Product"}
