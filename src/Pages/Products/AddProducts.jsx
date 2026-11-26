@@ -6,9 +6,13 @@ import api from "../../Services/api";
 const emptyVariant = () => ({
   sku: "",
   stock: "",
-  options: [{ name: "", value: "" }],
+  color: "",
+  size: "",
   images: [],
 });
+
+const inputClass =
+  "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none transition focus:border-[#421713]";
 
 const AddProducts = () => {
   const navigate = useNavigate();
@@ -35,11 +39,11 @@ const AddProducts = () => {
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [brandsError, setBrandsError] = useState("");
 
-  // MULTIPLE MAIN PRODUCT IMAGES
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
 
   const [variants, setVariants] = useState([emptyVariant()]);
+  const [variantPreviews, setVariantPreviews] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -96,7 +100,7 @@ const AddProducts = () => {
     fetchBrands();
   }, []);
 
-  // CREATE MAIN IMAGE PREVIEWS
+  // MAIN IMAGE PREVIEWS
   useEffect(() => {
     const previews = images.map((file) => URL.createObjectURL(file));
 
@@ -107,7 +111,20 @@ const AddProducts = () => {
     };
   }, [images]);
 
-  // FORM INPUT
+  // VARIANT IMAGE PREVIEWS
+  useEffect(() => {
+    const previews = variants.map((variant) =>
+      variant.images.map((file) => URL.createObjectURL(file)),
+    );
+
+    setVariantPreviews(previews);
+
+    return () => {
+      previews.flat().forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [variants]);
+
+  // GENERAL FORM INPUT
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -127,7 +144,7 @@ const AddProducts = () => {
     }));
   };
 
-  // MAIN PRODUCT MULTIPLE IMAGE UPLOAD
+  // MAIN PRODUCT IMAGE UPLOAD
   const handleImageChange = (e) => {
     const selectedFiles = Array.from(e.target.files || []);
 
@@ -143,8 +160,6 @@ const AddProducts = () => {
       return;
     }
 
-    setError("");
-
     setImages((prev) => {
       const combined = [...prev, ...selectedFiles];
 
@@ -153,13 +168,14 @@ const AddProducts = () => {
         return prev;
       }
 
+      setError("");
       return combined;
     });
 
     e.target.value = "";
   };
 
-  // REMOVE MAIN PRODUCT IMAGE
+  // REMOVE MAIN IMAGE
   const removeMainImage = (index) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
@@ -174,7 +190,7 @@ const AddProducts = () => {
     setVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // UPDATE VARIANT
+  // UPDATE VARIANT FIELD
   const handleVariantChange = (index, field, value) => {
     setVariants((prev) =>
       prev.map((variant, i) =>
@@ -183,57 +199,11 @@ const AddProducts = () => {
     );
   };
 
-  // ADD OPTION
-  const addOption = (variantIndex) => {
-    setVariants((prev) =>
-      prev.map((variant, i) =>
-        i === variantIndex
-          ? {
-              ...variant,
-              options: [...variant.options, { name: "", value: "" }],
-            }
-          : variant,
-      ),
-    );
-  };
-
-  // REMOVE OPTION
-  const removeOption = (variantIndex, optionIndex) => {
-    setVariants((prev) =>
-      prev.map((variant, i) =>
-        i === variantIndex
-          ? {
-              ...variant,
-              options: variant.options.filter(
-                (_, optionI) => optionI !== optionIndex,
-              ),
-            }
-          : variant,
-      ),
-    );
-  };
-
-  // UPDATE OPTION
-  const handleOptionChange = (variantIndex, optionIndex, field, value) => {
-    setVariants((prev) =>
-      prev.map((variant, i) =>
-        i === variantIndex
-          ? {
-              ...variant,
-              options: variant.options.map((option, optionI) =>
-                optionI === optionIndex
-                  ? { ...option, [field]: value }
-                  : option,
-              ),
-            }
-          : variant,
-      ),
-    );
-  };
-
   // VARIANT IMAGE UPLOAD
   const handleVariantImages = (index, files) => {
     const selectedFiles = Array.from(files || []);
+
+    if (!selectedFiles.length) return;
 
     const invalidFile = selectedFiles.find(
       (file) => !file.type.startsWith("image/") || file.size > 5 * 1024 * 1024,
@@ -274,11 +244,8 @@ const AddProducts = () => {
     );
   };
 
-  // SUBMIT PRODUCT
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
+  // VALIDATE FORM
+  const validateForm = () => {
     if (
       !formData.productName.trim() ||
       !formData.price ||
@@ -291,7 +258,7 @@ const AddProducts = () => {
       setError(
         "Please fill all required fields and upload at least one product image.",
       );
-      return;
+      return false;
     }
 
     if (
@@ -299,20 +266,20 @@ const AddProducts = () => {
       Number(formData.price) <= 0
     ) {
       setError("Please enter a valid product price.");
-      return;
+      return false;
     }
 
     if (
       !Number.isInteger(Number(formData.stock)) ||
       Number(formData.stock) < 0
     ) {
-      setError("Please enter a valid stock quantity.");
-      return;
+      setError("Please enter a valid product stock.");
+      return false;
     }
 
     if (variants.length === 0) {
       setError("Please add at least one variant.");
-      return;
+      return false;
     }
 
     const usedSkus = variants.map((variant) =>
@@ -321,12 +288,33 @@ const AddProducts = () => {
 
     if (usedSkus.some((sku) => !sku)) {
       setError("Please enter a SKU for every variant.");
-      return;
+      return false;
     }
 
     if (new Set(usedSkus).size !== usedSkus.length) {
       setError("Every variant must have a unique SKU.");
-      return;
+      return false;
+    }
+
+    // CHECK DUPLICATE COLOR + SIZE COMBINATIONS
+    const combinations = variants.map(
+      (variant) =>
+        `${variant.color.trim().toLowerCase()}-${variant.size.trim().toLowerCase()}`,
+    );
+
+    if (
+      combinations.some(
+        (combination) =>
+          combination.startsWith("-") || combination.endsWith("-"),
+      )
+    ) {
+      setError("Please enter both Color and Size for every variant.");
+      return false;
+    }
+
+    if (new Set(combinations).size !== combinations.length) {
+      setError("This Color and Size combination already exists.");
+      return false;
     }
 
     for (const variant of variants) {
@@ -336,40 +324,51 @@ const AddProducts = () => {
         Number(variant.stock) < 0
       ) {
         setError("Please enter valid stock for every variant.");
-        return;
+        return false;
       }
 
-      if (
-        variant.options.some(
-          (option) => !option.name.trim() || !option.value.trim(),
-        )
-      ) {
-        setError(
-          "Please complete all variant options or remove empty options.",
-        );
-        return;
+      if (!variant.color.trim() || !variant.size.trim()) {
+        setError("Please enter Color and Size for every variant.");
+        return false;
       }
     }
+
+    return true;
+  };
+
+  // SUBMIT PRODUCT
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!validateForm()) return;
 
     try {
       setLoading(true);
 
       const data = new FormData();
 
+      // PRODUCT INFORMATION
       data.append("productName", formData.productName.trim());
+
       data.append("price", formData.price);
       data.append("category", formData.category);
       data.append("brand", formData.brand);
       data.append("stock", formData.stock);
+
       data.append("description", formData.description.trim());
+
       data.append("gender", formData.gender);
 
       data.append("isFeatured", String(formData.isFeatured));
+
       data.append("isPublished", String(formData.isPublished));
+
       data.append("isBestSeller", String(formData.isBestSeller));
 
       data.append("salesCount", "0");
 
+      // PRODUCT SIZES
       const sizes = formData.size
         .split(",")
         .map((item) => item.trim())
@@ -377,23 +376,27 @@ const AddProducts = () => {
 
       data.append("size", JSON.stringify(sizes));
 
-      // MAIN PRODUCT IMAGE
-      // First image is also sent as the main/cover image.
-      data.append("image", images[0]);
-
-      // Send every main image in the images field.
+      // MAIN PRODUCT IMAGES
+      // Controller uses the images field.
       images.forEach((file) => {
         data.append("images", file);
       });
 
-      // VARIANT INFORMATION
-      const variantData = variants.map(({ sku, stock, options }) => ({
-        sku: sku.trim(),
-        stock: Number(stock),
-        options: options.map((option) => ({
-          name: option.name.trim(),
-          value: option.value.trim(),
-        })),
+      // VARIANT DATA
+      const variantData = variants.map((variant) => ({
+        sku: variant.sku.trim(),
+        stock: Number(variant.stock),
+
+        options: [
+          {
+            name: "Color",
+            value: variant.color.trim(),
+          },
+          {
+            name: "Size",
+            value: variant.size.trim(),
+          },
+        ],
       }));
 
       data.append("variants", JSON.stringify(variantData));
@@ -459,7 +462,7 @@ const AddProducts = () => {
                 value={formData.productName}
                 onChange={handleChange}
                 placeholder="Enter product name"
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                className={inputClass}
                 required
               />
             </div>
@@ -467,7 +470,7 @@ const AddProducts = () => {
             {/* PRICE */}
             <div>
               <label className="mb-2 block font-medium text-gray-700">
-                Price ($) *
+                Price *
               </label>
 
               <input
@@ -478,7 +481,7 @@ const AddProducts = () => {
                 value={formData.price}
                 onChange={handleChange}
                 placeholder="Enter price"
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                className={inputClass}
                 required
               />
             </div>
@@ -494,7 +497,7 @@ const AddProducts = () => {
                 value={formData.category}
                 onChange={handleChange}
                 disabled={categoriesLoading || categories.length === 0}
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713] disabled:bg-gray-100"
+                className={`${inputClass} disabled:bg-gray-100`}
                 required
               >
                 <option value="">
@@ -518,7 +521,7 @@ const AddProducts = () => {
 
               {!categoriesLoading && categories.length === 0 && (
                 <p className="mt-2 text-sm text-gray-500">
-                  Create a category before adding a product.{" "}
+                  Create a category first.{" "}
                   <Link
                     to="/admin/categories/add"
                     className="font-medium text-blue-600 hover:underline"
@@ -540,7 +543,7 @@ const AddProducts = () => {
                 value={formData.brand}
                 onChange={handleChange}
                 disabled={brandsLoading || brands.length === 0}
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713] disabled:bg-gray-100"
+                className={`${inputClass} disabled:bg-gray-100`}
                 required
               >
                 <option value="">
@@ -564,7 +567,7 @@ const AddProducts = () => {
 
               {!brandsLoading && brands.length === 0 && (
                 <p className="mt-2 text-sm text-gray-500">
-                  Create a brand before adding a product.{" "}
+                  Create a brand first.{" "}
                   <Link
                     to="/admin/brands/add"
                     className="font-medium text-blue-600 hover:underline"
@@ -585,7 +588,7 @@ const AddProducts = () => {
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                className={inputClass}
                 required
               >
                 <option value="His">His</option>
@@ -594,7 +597,7 @@ const AddProducts = () => {
               </select>
             </div>
 
-            {/* STOCK */}
+            {/* PRODUCT STOCK */}
             <div>
               <label className="mb-2 block font-medium text-gray-700">
                 Product Stock *
@@ -607,8 +610,8 @@ const AddProducts = () => {
                 step="1"
                 value={formData.stock}
                 onChange={handleChange}
-                placeholder="Enter stock quantity"
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                placeholder="Enter overall stock"
+                className={inputClass}
                 required
               />
 
@@ -617,7 +620,7 @@ const AddProducts = () => {
               </p>
             </div>
 
-            {/* SIZES */}
+            {/* AVAILABLE SIZES */}
             <div className="md:col-span-2">
               <label className="mb-2 block font-medium text-gray-700">
                 Available Sizes
@@ -628,12 +631,13 @@ const AddProducts = () => {
                 name="size"
                 value={formData.size}
                 onChange={handleChange}
-                placeholder="Example: S, M, L, XL"
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                placeholder="Example: 37, 38, 39, 40"
+                className={inputClass}
               />
 
               <p className="mt-1 text-xs text-gray-400">
-                Separate sizes using commas.
+                Optional product-level size list. The actual variant sizes are
+                saved separately below.
               </p>
             </div>
 
@@ -649,12 +653,12 @@ const AddProducts = () => {
                 value={formData.description}
                 onChange={handleChange}
                 placeholder="Enter product description"
-                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-[#421713]"
+                className={inputClass}
                 required
               />
             </div>
 
-            {/* MULTIPLE MAIN PRODUCT IMAGES */}
+            {/* MAIN PRODUCT IMAGES */}
             <div className="md:col-span-2">
               <label className="mb-2 block font-medium text-gray-700">
                 Product Images *
@@ -681,8 +685,7 @@ const AddProducts = () => {
               </label>
 
               <p className="mt-2 text-xs text-gray-400">
-                JPG, PNG, WEBP. Maximum 5 MB each. Maximum 10 images. The first
-                image will be the main product image.
+                JPG, PNG, WEBP. Maximum 5 MB each. Maximum 10 images.
               </p>
 
               {/* MAIN IMAGE PREVIEWS */}
@@ -738,7 +741,7 @@ const AddProducts = () => {
 
           {/* PRODUCT VARIANTS */}
           <div className="mt-10 border-t border-gray-200 pt-8">
-            <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-xl font-bold text-[#421713]">
                 Product Variants
               </h2>
@@ -752,6 +755,11 @@ const AddProducts = () => {
               </button>
             </div>
 
+            <p className="mb-6 text-sm text-gray-500">
+              Create one variant for each Color and Size combination. For
+              example, Blue / 38 and Blue / 39 are two separate variants.
+            </p>
+
             <div className="space-y-5">
               {variants.map((variant, index) => (
                 <div
@@ -759,10 +767,16 @@ const AddProducts = () => {
                   className="rounded-xl border border-gray-200 bg-[#fcfaf9] p-5 md:p-6"
                 >
                   {/* VARIANT HEADER */}
-                  <div className="mb-7 flex items-center justify-between">
-                    <h3 className="text-base font-bold text-gray-800">
-                      Variant #{index + 1}
-                    </h3>
+                  <div className="mb-6 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800">
+                        Variant #{index + 1}
+                      </h3>
+
+                      <p className="mt-1 text-xs text-gray-400">
+                        Individual color, size and stock
+                      </p>
+                    </div>
 
                     <button
                       type="button"
@@ -776,93 +790,86 @@ const AddProducts = () => {
 
                   {/* SKU AND STOCK */}
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <input
-                      type="text"
-                      value={variant.sku}
-                      onChange={(e) =>
-                        handleVariantChange(index, "sku", e.target.value)
-                      }
-                      placeholder="SKU"
-                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none transition focus:border-[#421713]"
-                      required
-                    />
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">
+                        SKU *
+                      </label>
 
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={variant.stock}
-                      onChange={(e) =>
-                        handleVariantChange(index, "stock", e.target.value)
-                      }
-                      placeholder="Stock"
-                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none transition focus:border-[#421713]"
-                      required
-                    />
-                  </div>
-
-                  {/* OPTIONS */}
-                  <div className="mt-6">
-                    <label className="mb-3 block text-sm font-semibold text-gray-800">
-                      Options (e.g. Size: M, Color: Red)
-                    </label>
-
-                    <div className="space-y-3">
-                      {variant.options.map((option, optionIndex) => (
-                        <div key={optionIndex}>
-                          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                            <input
-                              type="text"
-                              value={option.name}
-                              onChange={(e) =>
-                                handleOptionChange(
-                                  index,
-                                  optionIndex,
-                                  "name",
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Option Name"
-                              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none transition focus:border-[#421713]"
-                              required
-                            />
-
-                            <input
-                              type="text"
-                              value={option.value}
-                              onChange={(e) =>
-                                handleOptionChange(
-                                  index,
-                                  optionIndex,
-                                  "value",
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Option Value"
-                              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none transition focus:border-[#421713]"
-                              required
-                            />
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => removeOption(index, optionIndex)}
-                            className="mt-2 flex h-8 w-8 items-center justify-center text-red-600 transition hover:rounded-full hover:bg-red-50"
-                            title="Remove option"
-                          >
-                            <X size={19} />
-                          </button>
-                        </div>
-                      ))}
+                      <input
+                        type="text"
+                        value={variant.sku}
+                        onChange={(e) =>
+                          handleVariantChange(index, "sku", e.target.value)
+                        }
+                        placeholder="Example: SHOE-BLUE-38"
+                        className={inputClass}
+                        required
+                      />
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => addOption(index)}
-                      className="mt-4 text-sm font-medium text-blue-600 transition hover:text-blue-800"
-                    >
-                      + Add Option
-                    </button>
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">
+                        Stock *
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={variant.stock}
+                        onChange={(e) =>
+                          handleVariantChange(index, "stock", e.target.value)
+                        }
+                        placeholder="Enter stock"
+                        className={inputClass}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* COLOR AND SIZE */}
+                  <div className="mt-6">
+                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                      Variant Options
+                    </h4>
+
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      {/* COLOR */}
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">
+                          Color *
+                        </label>
+
+                        <input
+                          type="text"
+                          value={variant.color}
+                          onChange={(e) =>
+                            handleVariantChange(index, "color", e.target.value)
+                          }
+                          placeholder="Example: Blue"
+                          className={inputClass}
+                          required
+                        />
+                      </div>
+
+                      {/* SIZE */}
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">
+                          Size *
+                        </label>
+
+                        <input
+                          type="text"
+                          value={variant.size}
+                          onChange={(e) =>
+                            handleVariantChange(index, "size", e.target.value)
+                          }
+                          placeholder="Example: 38"
+                          className={inputClass}
+                          required
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* VARIANT IMAGES */}
@@ -873,7 +880,7 @@ const AddProducts = () => {
 
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-blue-300 bg-white px-5 py-4 text-sm font-medium text-blue-600 transition hover:border-blue-500 hover:bg-blue-50">
                       <UploadCloud size={21} />
-                      Upload
+                      Upload Variant Images
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -881,6 +888,7 @@ const AddProducts = () => {
                         className="hidden"
                         onChange={(e) => {
                           handleVariantImages(index, e.target.files);
+
                           e.target.value = "";
                         }}
                       />
@@ -899,7 +907,7 @@ const AddProducts = () => {
                             className="relative"
                           >
                             <img
-                              src={URL.createObjectURL(file)}
+                              src={variantPreviews[index]?.[imageIndex]}
                               alt={`Variant ${index + 1} image ${imageIndex + 1}`}
                               className="h-28 w-full rounded-lg border border-gray-200 object-cover"
                             />
@@ -910,6 +918,7 @@ const AddProducts = () => {
                                 removeVariantImage(index, imageIndex)
                               }
                               className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow transition hover:bg-red-700"
+                              title="Remove image"
                             >
                               <X size={15} />
                             </button>
@@ -937,6 +946,7 @@ const AddProducts = () => {
                 onChange={handleStatusChange}
                 className="h-5 w-5 cursor-pointer accent-[#421713]"
               />
+
               <span className="font-semibold text-gray-800">Published</span>
             </label>
 
@@ -948,6 +958,7 @@ const AddProducts = () => {
                 onChange={handleStatusChange}
                 className="h-5 w-5 cursor-pointer accent-[#421713]"
               />
+
               <span className="font-semibold text-gray-800">Featured</span>
             </label>
 
@@ -959,6 +970,7 @@ const AddProducts = () => {
                 onChange={handleStatusChange}
                 className="h-5 w-5 cursor-pointer accent-[#421713]"
               />
+
               <span className="font-semibold text-gray-800">Best Seller</span>
             </label>
           </div>
